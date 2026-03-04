@@ -11,7 +11,7 @@ public_key = quote_plus(os.getenv("PUBLIC_KEY", ""))
 private_key = quote_plus(os.getenv("PRIVATE_KEY", ""))
 cluster = os.getenv("MONGO_CLUSTER")
 
-uri = f"mongodb+srv://{public_key}:{private_key}@{cluster}/?authSource=%24external&authMechanism=MONGODB-OIDC"
+uri = f"mongodb+srv://{public_key}:{private_key}@{cluster}/?authSource=admin"
 
 app = FastAPI()
 client = MongoClient(uri)
