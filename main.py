@@ -6,12 +6,15 @@ from dotenv import load_dotenv
 from urllib.parse import quote_plus
 
 load_dotenv()
+
 public_key = quote_plus(os.getenv("PUBLIC_KEY", ""))
 private_key = quote_plus(os.getenv("PRIVATE_KEY", ""))
+cluster = os.getenv("MONGO_CLUSTER")
 
-uri = f"mongodb+srv://{public_key}:{private_key}@your-cluster.mongodb.net/dbname"
+uri = f"mongodb+srv://{public_key}:{private_key}@{cluster}/?authSource=%24external&authMechanism=MONGODB-OIDC"
+
 app = FastAPI()
-client = MongoClient(os.getenv(uri))
+client = MongoClient(uri)
 db = client["iiif"]
 works_coll = db["works"]
 collections_coll = db["collections"]
