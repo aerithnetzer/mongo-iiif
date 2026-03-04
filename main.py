@@ -11,8 +11,7 @@ private_key = quote_plus(os.getenv("PRIVATE_KEY", ""))
 
 uri = f"mongodb+srv://{public_key}:{private_key}@your-cluster.mongodb.net/dbname"
 app = FastAPI()
-
-client = MongoClient(os.getenv("MONGODB_OCR_DEVELOPMENT_CONN_STRING_IMPULSE"))
+client = MongoClient(os.getenv(uri))
 db = client["iiif"]
 works_coll = db["works"]
 collections_coll = db["collections"]
