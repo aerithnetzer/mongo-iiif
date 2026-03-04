@@ -1,20 +1,47 @@
 import os
+import requests
 from fastapi import FastAPI, HTTPException, Body, Request, Header
 from fastapi.responses import JSONResponse
 from pymongo import MongoClient
+from pymongo.auth_oidc import OIDCCallback, OIDCCallbackContext, OIDCCallbackResult
 from dotenv import load_dotenv
-from urllib.parse import quote_plus
 
 load_dotenv()
 
-public_key = quote_plus(os.getenv("PUBLIC_KEY", ""))
-private_key = quote_plus(os.getenv("PRIVATE_KEY", ""))
-cluster = os.getenv("MONGO_CLUSTER")
+CLIENT_ID = os.getenv("PUBLIC_KEY")
+CLIENT_SECRET = os.getenv("PRIVATE_KEY")
+CLUSTER = os.getenv("MONGO_CLUSTER")
 
-uri = f"mongodb+srv://{public_key}:{private_key}@{cluster}/?authSource=admin"
+
+def fetch_oidc_token() -> str:
+    resp = requests.post(
+        "https://services.cloud.mongodb.com/api/client/v2.0/auth/token",
+        json={
+            "grant_type": "client_credentials",
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+
+class ServiceAccountCallback(OIDCCallback):
+    def fetch(self, context: OIDCCallbackContext) -> OIDCCallbackResult:
+        return OIDCCallbackResult(access_token=fetch_oidc_token())
+
+
+uri = f"mongodb+srv://{CLUSTER}/?authMechanism=MONGODB-OIDC"
 
 app = FastAPI()
-client = MongoClient(uri)
+client = MongoClient(
+    uri,
+    authMechanism="MONGODB-OIDC",
+    authMechanismProperties={
+        "OIDC_CALLBACK": ServiceAccountCallback(),
+        "ENVIRONMENT": "test",
+    },
+)
 db = client["iiif"]
 works_coll = db["works"]
 collections_coll = db["collections"]
@@ -39,35 +66,26 @@ def put_work(
     manifest: dict = Body(...),
     authorization: str | None = Header(default=None),
 ):
-    """
-    Store a full IIIF Manifest JSON document.
-    Requires a valid Bearer token in the Authorization header.
-    The item_id becomes the Mongo _id, and the manifest's id field
-    is set to the full URL of this endpoint.
-    """
     verify_token(authorization)
     base_url = str(request.base_url).rstrip("/")
     full_id = f"{base_url}/works/{item_id}"
     manifest["_id"] = item_id
-    manifest["id"] = full_id    # IIIF v3
-    manifest["@id"] = full_id   # IIIF v2 compatibility
+    manifest["id"] = full_id
+    manifest["@id"] = full_id
     works_coll.replace_one({"_id": item_id}, manifest, upsert=True)
     return {"success": True, "id": full_id}
 
 
 @app.get("/works/{item_id}")
 def get_work(item_id: str, request: Request):
-    """
-    Return the stored IIIF manifest JSON, with id reflecting the live request URL.
-    """
     manifest = works_coll.find_one({"_id": item_id})
     if not manifest:
         raise HTTPException(status_code=404, detail="Manifest not found")
     base_url = str(request.base_url).rstrip("/")
     full_id = f"{base_url}/works/{item_id}"
     manifest.pop("_id", None)
-    manifest["id"] = full_id    # IIIF v3
-    manifest["@id"] = full_id   # IIIF v2 compatibility
+    manifest["id"] = full_id
+    manifest["@id"] = full_id
     return JSONResponse(content=manifest)
 
 
@@ -80,33 +98,24 @@ def put_collection(
     manifest: dict = Body(...),
     authorization: str | None = Header(default=None),
 ):
-    """
-    Store a full IIIF Collection JSON document.
-    Requires a valid Bearer token in the Authorization header.
-    The item_id becomes the Mongo _id, and the manifest's id field
-    is set to the full URL of this endpoint.
-    """
     verify_token(authorization)
     base_url = str(request.base_url).rstrip("/")
     full_id = f"{base_url}/collections/{item_id}"
     manifest["_id"] = item_id
-    manifest["id"] = full_id    # IIIF v3
-    manifest["@id"] = full_id   # IIIF v2 compatibility
+    manifest["id"] = full_id
+    manifest["@id"] = full_id
     collections_coll.replace_one({"_id": item_id}, manifest, upsert=True)
     return {"success": True, "id": full_id}
 
 
 @app.get("/collections/{item_id}")
 def get_collection(item_id: str, request: Request):
-    """
-    Return the stored IIIF collection JSON, with id reflecting the live request URL.
-    """
     manifest = collections_coll.find_one({"_id": item_id})
     if not manifest:
         raise HTTPException(status_code=404, detail="Collection not found")
     base_url = str(request.base_url).rstrip("/")
     full_id = f"{base_url}/collections/{item_id}"
     manifest.pop("_id", None)
-    manifest["id"] = full_id    # IIIF v3
-    manifest["@id"] = full_id   # IIIF v2 compatibility
+    manifest["id"] = full_id
+    manifest["@id"] = full_id
     return JSONResponse(content=manifest)
