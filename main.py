@@ -3,9 +3,13 @@ from fastapi import FastAPI, HTTPException, Body, Request, Header
 from fastapi.responses import JSONResponse
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 load_dotenv()
+public_key = quote_plus(os.getenv("PUBLIC_KEY", ""))
+private_key = quote_plus(os.getenv("PRIVATE_KEY", ""))
 
+uri = f"mongodb+srv://{public_key}:{private_key}@your-cluster.mongodb.net/dbname"
 app = FastAPI()
 
 client = MongoClient(os.getenv("MONGODB_OCR_DEVELOPMENT_CONN_STRING_IMPULSE"))
