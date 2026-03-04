@@ -31,16 +31,11 @@ class ServiceAccountCallback(OIDCCallback):
         return OIDCCallbackResult(access_token=fetch_oidc_token())
 
 
-uri = f"mongodb+srv://{CLUSTER}/?authMechanism=MONGODB-OIDC"
-
 app = FastAPI()
 client = MongoClient(
-    uri,
+    host=f"mongodb+srv://{CLUSTER}/",
     authMechanism="MONGODB-OIDC",
-    authMechanismProperties={
-        "OIDC_CALLBACK": ServiceAccountCallback(),
-        "ENVIRONMENT": "test",
-    },
+    authMechanismProperties={"OIDC_CALLBACK": ServiceAccountCallback()},
 )
 db = client["iiif"]
 works_coll = db["works"]
