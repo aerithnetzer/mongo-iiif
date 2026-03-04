@@ -1,42 +1,20 @@
 import os
-import requests
+from urllib.parse import quote_plus
 from fastapi import FastAPI, HTTPException, Body, Request, Header
 from fastapi.responses import JSONResponse
 from pymongo import MongoClient
-from pymongo.auth_oidc import OIDCCallback, OIDCCallbackContext, OIDCCallbackResult
 from dotenv import load_dotenv
 
 load_dotenv()
 
-CLIENT_ID = os.getenv("PUBLIC_KEY")
-CLIENT_SECRET = os.getenv("PRIVATE_KEY")
-CLUSTER = os.getenv("MONGO_CLUSTER")
+user = quote_plus(os.getenv("MONGO_USER", ""))
+password = quote_plus(os.getenv("MONGO_PASS", ""))
+cluster = os.getenv("MONGO_CLUSTER")
 
-
-def fetch_oidc_token() -> str:
-    resp = requests.post(
-        "https://services.cloud.mongodb.com/api/client/v2.0/auth/token",
-        json={
-            "grant_type": "client_credentials",
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-        },
-    )
-    resp.raise_for_status()
-    return resp.json()["access_token"]
-
-
-class ServiceAccountCallback(OIDCCallback):
-    def fetch(self, context: OIDCCallbackContext) -> OIDCCallbackResult:
-        return OIDCCallbackResult(access_token=fetch_oidc_token())
-
+uri = f"mongodb+srv://{user}:{password}@{cluster}/iiif"
 
 app = FastAPI()
-client = MongoClient(
-    host=f"mongodb+srv://{CLUSTER}/",
-    authMechanism="MONGODB-OIDC",
-    authMechanismProperties={"OIDC_CALLBACK": ServiceAccountCallback()},
-)
+client = MongoClient(uri)
 db = client["iiif"]
 works_coll = db["works"]
 collections_coll = db["collections"]
